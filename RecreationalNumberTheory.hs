@@ -1,5 +1,8 @@
 module RecreationalNumberTheory where
 
+import Data.List
+import Data.Maybe
+
 -- The presumption is that a is an ordered and enumerable type, whose
 -- enumeration is compatible with its ordering.  Betweens a extends a
 -- with elements representing the spaces in the ordering of a between
@@ -33,6 +36,21 @@ data View ind a
     | UpRanger (ind -> ind -> [a])
     | DownRanger (ind -> ind -> [a])
 
+data ViewType = GeneratorT | InverterT | TesterT | CounterT
+              | StreamerT | UpStreamerT | DownStreamerT | UpRangerT | DownRangerT
+  deriving (Eq, Show)
+
+viewType :: View ind a -> ViewType
+viewType (Generator _) = GeneratorT
+viewType (Inverter _) = InverterT
+viewType (Tester _) = TesterT
+viewType (Counter _) = CounterT
+viewType (Streamer _) = StreamerT
+viewType (UpStreamer _) = UpStreamerT
+viewType (DownStreamer _) = DownStreamerT
+viewType (UpRanger _) = UpRangerT
+viewType (DownRanger _) = DownRangerT
+
 data Sequence ind a
     = Sequence { kth :: (ind -> a)
                , root :: (a -> Betweens ind)
@@ -45,8 +63,29 @@ data Sequence ind a
                , downFromTo :: (a -> a -> [a])
                }
 
+makeSequence :: [View ind a] -> Sequence ind a
+makeSequence views = Sequence { kth = fromJust $ find (\v -> viewType v == GeneratorT) views
+                              , root = fromJust $ find (\v -> viewType v == InverterT) views
+                              , is = fromJust $ find (\v -> viewType v == TesterT) views
+                              , count = fromJust $ find (\v -> viewType v == CounterT) views
+                              , the = fromJust $ find (\v -> viewType v == StreamerT) views
+                              , from = fromJust $ find (\v -> viewType v == UpStreamerT) views
+                              , downFrom = fromJust $ find (\v -> viewType v == DownStreamerT) views
+                              , fromTo = fromJust $ find (\v -> viewType v == UpRangerT) views
+                              , downFromTo = fromJust $ find (\v -> viewType v == DownRangerT) views
+                              }
+
+transforms :: [View ind a -> Maybe (View ind a)]
+transforms = []
+
 define :: [View ind a] -> Sequence ind a
-define = undefined
+define views = makeSequence $ loop views transforms where
+    loop views [] = views
+    loop views (t:ts) = case attempt t views of
+                          (Just new) -> loop (new:views) transforms
+                          Nothing -> loop views ts
+    attempt t views = listToMaybe $ filter (`notThere` views) $ catMaybes $ map t views
+    notThere view views = viewType view `notElem` (map viewType views)
 
 square = define [Generator (\k -> k * k)]
 squares = square
