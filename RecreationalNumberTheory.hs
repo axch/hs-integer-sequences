@@ -25,6 +25,31 @@ instance (Enum a) => (Enum (Betweens a)) where
     fromEnum (Exactly x) = 2 * fromEnum x
     fromEnum (After x) = 2 * fromEnum x + 1
 
+-- generator
+-- inverter
+-- tester
+-- counter
+-- streamer
+-- upStreamer
+-- downStreamer
+-- upRanger
+-- downRanger
+
+data PartialSequence ind a
+    = PartialSequence { generator :: Maybe (ind -> a)
+                      , inverter :: Maybe (a -> Betweens ind)
+                      , tester :: Maybe (a -> Bool)
+                      , counter :: Maybe (a -> a -> Integer)
+                      , streamer :: Maybe (() -> [a])
+                      , upStreamer :: Maybe (ind -> [a])
+                      , downStreamer :: Maybe (ind -> [a])
+                      , upRanger :: Maybe (ind -> ind -> [a])
+                      , downRanger :: Maybe (ind -> ind -> [a])
+                      }
+
+empty :: PartialSequence ind a
+empty = PartialSequence Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
 data View ind a
     = Generator (ind -> a)
     | Inverter (a -> Betweens ind)
@@ -36,20 +61,16 @@ data View ind a
     | UpRanger (ind -> ind -> [a])
     | DownRanger (ind -> ind -> [a])
 
-data ViewType = GeneratorT | InverterT | TesterT | CounterT
-              | StreamerT | UpStreamerT | DownStreamerT | UpRangerT | DownRangerT
-  deriving (Eq, Show)
-
-viewType :: View ind a -> ViewType
-viewType (Generator _) = GeneratorT
-viewType (Inverter _) = InverterT
-viewType (Tester _) = TesterT
-viewType (Counter _) = CounterT
-viewType (Streamer _) = StreamerT
-viewType (UpStreamer _) = UpStreamerT
-viewType (DownStreamer _) = DownStreamerT
-viewType (UpRanger _) = UpRangerT
-viewType (DownRanger _) = DownRangerT
+addView :: PartialSequence ind a -> View ind a -> PartialSequence ind a
+addView s (Generator f) = s{generator = Just f}
+addView s (Inverter f) = s{inverter = Just f}
+addView s (Tester f) = s{tester = Just f}
+addView s (Counter f) = s{counter = Just f}
+addView s (Streamer f) = s{streamer = Just f}
+addView s (UpStreamer f) = s{upStreamer = Just f}
+addView s (DownStreamer f) = s{downStreamer = Just f}
+addView s (UpRanger f) = s{upRanger = Just f}
+addView s (DownRanger f) = s{downRanger = Just f}
 
 data Sequence ind a
     = Sequence { kth :: (ind -> a)
@@ -57,35 +78,54 @@ data Sequence ind a
                , is :: (a -> Bool)
                , count :: (a -> a -> Integer)
                , the :: (() -> [a])
-               , from :: (a -> [a])
-               , downFrom :: (a -> [a])
-               , fromTo :: (a -> a -> [a])
-               , downFromTo :: (a -> a -> [a])
+               , from :: (ind -> [a])
+               , downFrom :: (ind -> [a])
+               , fromTo :: (ind -> ind -> [a])
+               , downFromTo :: (ind -> ind -> [a])
                }
 
-makeSequence :: [View ind a] -> Sequence ind a
-makeSequence views = Sequence { kth = fromJust $ find (\v -> viewType v == GeneratorT) views
-                              , root = fromJust $ find (\v -> viewType v == InverterT) views
-                              , is = fromJust $ find (\v -> viewType v == TesterT) views
-                              , count = fromJust $ find (\v -> viewType v == CounterT) views
-                              , the = fromJust $ find (\v -> viewType v == StreamerT) views
-                              , from = fromJust $ find (\v -> viewType v == UpStreamerT) views
-                              , downFrom = fromJust $ find (\v -> viewType v == DownStreamerT) views
-                              , fromTo = fromJust $ find (\v -> viewType v == UpRangerT) views
-                              , downFromTo = fromJust $ find (\v -> viewType v == DownRangerT) views
-                              }
+freeze :: PartialSequence ind a -> Sequence ind a
+freeze PartialSequence { generator = Just kth
+                       , inverter = Just root
+                       , tester = Just is
+                       , counter = Just count
+                       , streamer = Just the
+                       , upStreamer = Just from
+                       , downStreamer = Just downFrom
+                       , upRanger = Just fromTo
+                       , downRanger = Just downFromTo
+                       }
+    = Sequence { kth = kth
+               , root = root
+               , is = is
+               , count = count
+               , the = the
+               , from = from
+               , downFrom = downFrom
+               , fromTo = fromTo
+               , downFromTo = downFromTo
+               }
+freeze _ = error "Freezing incomplete sequence definition"
 
-transforms :: [View ind a -> Maybe (View ind a)]
-transforms = []
+inverterToTester :: (a -> Betweens ind) -> a -> Bool
+inverterToTester inv n = case inv n of
+                           Exactly _ -> True
+                           After _ -> False
+
+inverterToTesterS :: PartialSequence ind a -> Maybe (PartialSequence ind a)
+inverterToTesterS s@PartialSequence { inverter = (Just inv), tester = Nothing } =
+    Just s{ tester = Just $ inverterToTester inv }
+inverterToTesterS _ = Nothing
+
+transforms :: [PartialSequence ind a -> Maybe (PartialSequence ind a)]
+transforms = [inverterToTesterS]
 
 define :: [View ind a] -> Sequence ind a
-define views = makeSequence $ loop views transforms where
-    loop views [] = views
-    loop views (t:ts) = case attempt t views of
-                          (Just new) -> loop (new:views) transforms
-                          Nothing -> loop views ts
-    attempt t views = listToMaybe $ filter (`notThere` views) $ catMaybes $ map t views
-    notThere view views = viewType view `notElem` (map viewType views)
+define = freeze . complete . build where
+    build = foldl' addView empty
+    complete s = case listToMaybe $ catMaybes $ map ($ s) transforms of
+                   Nothing -> s
+                   (Just s') -> complete s'
 
 square = define [Generator (\k -> k * k)]
 squares = square
