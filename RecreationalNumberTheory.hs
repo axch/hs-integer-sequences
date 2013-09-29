@@ -3,6 +3,8 @@ module RecreationalNumberTheory where
 import Data.List
 import Data.Maybe
 
+import NumberTheoryMeta
+
 -- The presumption is that a is an ordered and enumerable type, whose
 -- enumeration is compatible with its ordering.  Betweens a extends a
 -- with elements representing the spaces in the ordering of a between
@@ -112,13 +114,14 @@ inverterToTester inv n = case inv n of
                            Exactly _ -> True
                            After _ -> False
 
-inverterToTesterS :: PartialSequence ind a -> Maybe (PartialSequence ind a)
-inverterToTesterS s@PartialSequence { inverter = (Just inv), tester = Nothing } =
-    Just s{ tester = Just $ inverterToTester inv }
-inverterToTesterS _ = Nothing
+-- $(transformer "inverterToTester") is expected to produce this:
+-- inverterToTesterS :: PartialSequence ind a -> Maybe (PartialSequence ind a)
+-- inverterToTesterS s@PartialSequence { inverter = (Just inv), tester = Nothing } =
+--     Just s{ tester = Just $ inverterToTester inv }
+-- inverterToTesterS _ = Nothing
 
 transforms :: [PartialSequence ind a -> Maybe (PartialSequence ind a)]
-transforms = [inverterToTesterS]
+transforms = [$(transformer "inverterToTester")]
 
 define :: [View ind a] -> Sequence ind a
 define = freeze . complete . build where
