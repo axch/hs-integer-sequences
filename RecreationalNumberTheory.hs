@@ -2,6 +2,7 @@ module RecreationalNumberTheory where
 
 import Data.List
 import Data.Maybe
+import Language.Haskell.TH (listE)
 
 import NumberTheoryMeta
 
@@ -121,7 +122,7 @@ inverterToTester inv n = case inv n of
 -- inverterToTesterS _ = Nothing
 
 transforms :: [PartialSequence ind a -> Maybe (PartialSequence ind a)]
-transforms = [$(transformer 'inverterToTester)]
+transforms = $(listE $ map transformer ['inverterToTester])
 
 define :: [View ind a] -> Sequence ind a
 define = freeze . complete . build where
