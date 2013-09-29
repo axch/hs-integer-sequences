@@ -1,5 +1,6 @@
 module RecreationalNumberTheory where
 
+import Prelude hiding (ceiling)
 import Data.List
 import Data.Maybe
 import Language.Haskell.TH (listE)
@@ -28,6 +29,10 @@ instance (Enum a) => (Enum (Betweens a)) where
     fromEnum (Exactly x) = 2 * fromEnum x
     fromEnum (After x) = 2 * fromEnum x + 1
 
+ceiling :: (Enum a) => Betweens a -> a
+ceiling (Exactly x) = x
+ceiling (After x) = succ x
+
 -- generator
 -- inverter
 -- tester
@@ -44,10 +49,10 @@ data PartialSequence ind a
                       , tester :: Maybe (a -> Bool)
                       , counter :: Maybe (a -> a -> Integer)
                       , streamer :: Maybe (() -> [a])
-                      , upStreamer :: Maybe (ind -> [a])
-                      , downStreamer :: Maybe (ind -> [a])
-                      , upRanger :: Maybe (ind -> ind -> [a])
-                      , downRanger :: Maybe (ind -> ind -> [a])
+                      , upStreamer :: Maybe (a -> [a])
+                      , downStreamer :: Maybe (a -> [a])
+                      , upRanger :: Maybe (a -> a -> [a])
+                      , downRanger :: Maybe (a -> a -> [a])
                       }
 
 empty :: PartialSequence ind a
@@ -59,10 +64,10 @@ data View ind a
     | Tester (a -> Bool)
     | Counter (a -> a -> Integer) -- Is there a good way to generalize this like genericLength?
     | Streamer (() -> [a])
-    | UpStreamer (ind -> [a])
-    | DownStreamer (ind -> [a])
-    | UpRanger (ind -> ind -> [a])
-    | DownRanger (ind -> ind -> [a])
+    | UpStreamer (a -> [a])
+    | DownStreamer (a -> [a])
+    | UpRanger (a -> a -> [a])
+    | DownRanger (a -> a -> [a])
 
 addView :: PartialSequence ind a -> View ind a -> PartialSequence ind a
 addView s (Generator f) = s{generator = Just f}
@@ -81,10 +86,10 @@ data Sequence ind a
                , is :: (a -> Bool)
                , count :: (a -> a -> Integer)
                , the :: (() -> [a])
-               , from :: (ind -> [a])
-               , downFrom :: (ind -> [a])
-               , fromTo :: (ind -> ind -> [a])
-               , downFromTo :: (ind -> ind -> [a])
+               , from :: (a -> [a])
+               , downFrom :: (a -> [a])
+               , fromTo :: (a -> a -> [a])
+               , downFromTo :: (a -> a -> [a])
                }
 
 freeze :: PartialSequence ind a -> Sequence ind a
@@ -110,21 +115,105 @@ freeze PartialSequence { generator = Just kth
                }
 freeze _ = error "Freezing incomplete sequence definition"
 
+invertByBinarySearch :: (Integral ind, Ord a) => (ind -> a) -> (a -> Betweens ind)
+invertByBinarySearch f n = up 0 where
+    up i = if n <= (f next) then
+               search i next
+           else
+               up next
+        where next = 2 * i + 1
+    search low high = if low == mid then
+                          if n == f high then
+                              Exactly high
+                          else
+                              After low
+                      else
+                          if n <= f mid then
+                              search low mid
+                          else
+                              search mid high
+        where mid = (low + high) `div` 2
+
+-- The Single Steps
+
+generatorToInverter :: (Integral ind, Ord a) => (ind -> a) -> (a -> Betweens ind)
+generatorToInverter = invertByBinarySearch
+
+-- TODO inverterToGenerator
+
 inverterToTester :: (a -> Betweens ind) -> a -> Bool
 inverterToTester inv n = case inv n of
                            Exactly _ -> True
                            After _ -> False
+testerToUpRanger t low high = filter t [low..high]
+testerToDownRanger t low high = filter t [high,(high-1)..low]
+testerToUpStreamer t low = filter t [low..]
+downRangerToDownStreamer r high = r 0 high
+upStreamerToStreamer u () = u 1
+streamerToGenerator s k = (s ()) `genericIndex` k
+generatorToStreamer g () = map g [1..]
+streamerToUpStreamer s low = dropWhile (< low) (s ())
+upStreamerToUpRanger u low high = takeWhile (< high) (u low)
+upRangerToUpStreamer u low = concatMap interval $ iterate next low
+    where next n = n+1 `max` 2*n
+          interval n = u n (next n)
+upRangerToDownRanger u low high = reverse $ u (low + 1) (high + 1) -- Add 1 to fix inclusivity
+upRangerToTester u n = not $ null $ u n (n + 1)
+downStreamerToDownRanger d low high = takeWhile (> low) (d high)
+downRangerToUpRanger d low high = reverse $ d (low - 1) (high - 1) -- Subtract 1 to fix inclusivity
+downRangerToTester d n = not $ null $ d (n - 1) n
 
--- $(transformer "inverterToTester") is expected to produce this:
+-- TODO The three binary steps from numbers-meta.scm
+
+upRangerToCounter u low high = genericLength $ u low high
+downRangerToCounter d low high = genericLength $ d (low - 1) (high - 1) -- Subtract 1 to fix inclusivity
+inverterToCounter :: (Enum ind, Num ind) => (a -> Betweens ind) -> a -> a -> ind
+inverterToCounter inv low high = ceiling (inv high) - ceiling (inv low)
+counterToTester c n = c n (n+1) > 0
+counterToInverter c n = if nCount == 0 then
+                            After (c 0 n)
+                        else
+                            Exactly (c 0 n + 1)
+    where nCount = c n (n+1)
+
+-- $(transformer 'inverterToTester) is expected to produce this (as a
+-- lambda expression, and without the type declaration):
 -- inverterToTesterS :: PartialSequence ind a -> Maybe (PartialSequence ind a)
 -- inverterToTesterS s@PartialSequence { inverter = (Just inv), tester = Nothing } =
 --     Just s{ tester = Just $ inverterToTester inv }
 -- inverterToTesterS _ = Nothing
 
-transforms :: [PartialSequence ind a -> Maybe (PartialSequence ind a)]
-transforms = $(listE $ map transformer ['inverterToTester])
+transforms :: (Integral ind, Num a, Ord a, Enum a) => [PartialSequence ind a -> Maybe (PartialSequence ind a)]
+transforms = $(listE $ map transformer
+  [ 'inverterToTester
+  -- , 'inverterToCounter -- TODO Debug this error message
+  , 'counterToTester
+  -- , 'counterToInverter -- TODO Debug this error message
+  , 'generatorToStreamer
+  , 'downRangerToDownStreamer
+  , 'upStreamerToStreamer
+  , 'upStreamerToUpRanger
+  , 'downStreamerToDownRanger
+  , 'upRangerToTester
+  , 'downRangerToTester
+  , 'upRangerToCounter
+  , 'downRangerToCounter
+  -- TODO Binary transforms go here?
+  , 'generatorToInverter
+  -- TODO Order of these five?
+  , 'streamerToUpStreamer
+  , 'testerToUpRanger
+  , 'testerToDownRanger
+  , 'testerToUpStreamer
+  , 'upRangerToUpStreamer
 
-define :: [View ind a] -> Sequence ind a
+  , 'upRangerToDownRanger
+  , 'downRangerToUpRanger
+  , 'streamerToGenerator
+  -- TODO , 'inverterToGenerator
+  ])
+
+define :: (Integral ind, Num a, Ord a, Enum a) => [View ind a] -> Sequence ind a
 define = freeze . complete . build where
     build = foldl' addView empty
     complete s = case listToMaybe $ catMaybes $ map ($ s) transforms of
