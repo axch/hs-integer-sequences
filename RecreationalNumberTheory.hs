@@ -1,7 +1,5 @@
 module RecreationalNumberTheory where
 
-type Index = Integer -- Is there a good way to generalize this to e.g., Int indexes?
-
 -- The presumption is that a is an ordered and enumerable type, whose
 -- enumeration is compatible with its ordering.  Betweens a extends a
 -- with elements representing the spaces in the ordering of a between
@@ -24,20 +22,20 @@ instance (Enum a) => (Enum (Betweens a)) where
     fromEnum (Exactly x) = 2 * fromEnum x
     fromEnum (After x) = 2 * fromEnum x + 1
 
-data View a
-    = Generator (Index -> a)
-    | Inverter (a -> Betweens Index)
+data View ind a
+    = Generator (ind -> a)
+    | Inverter (a -> Betweens ind)
     | Tester (a -> Bool)
     | Counter (a -> a -> Integer) -- Is there a good way to generalize this like genericLength?
     | Streamer (() -> [a])
-    | UpStreamer (Index -> [a])
-    | DownStreamer (Index -> [a])
-    | UpRanger (Index -> Index -> [a])
-    | DownRanger (Index -> Index -> [a])
+    | UpStreamer (ind -> [a])
+    | DownStreamer (ind -> [a])
+    | UpRanger (ind -> ind -> [a])
+    | DownRanger (ind -> ind -> [a])
 
-data Sequence a
-    = Sequence { kth :: (Index -> a)
-               , root :: (a -> Betweens Index)
+data Sequence ind a
+    = Sequence { kth :: (ind -> a)
+               , root :: (a -> Betweens ind)
                , is :: (a -> Bool)
                , count :: (a -> a -> Integer)
                , the :: (() -> [a])
@@ -47,7 +45,7 @@ data Sequence a
                , downFromTo :: (a -> a -> [a])
                }
 
-define :: [View a] -> Sequence a
+define :: [View ind a] -> Sequence ind a
 define = undefined
 
 square = define [Generator (\k -> k * k)]
