@@ -121,7 +121,7 @@ inverterToTester inv n = case inv n of
 -- inverterToTesterS _ = Nothing
 
 transforms :: [PartialSequence ind a -> Maybe (PartialSequence ind a)]
-transforms = [$(transformer "inverterToTester")]
+transforms = [$(transformer 'inverterToTester)]
 
 define :: [View ind a] -> Sequence ind a
 define = freeze . complete . build where

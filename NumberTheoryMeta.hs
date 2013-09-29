@@ -7,21 +7,22 @@ import Data.Char
 import Data.List.Split -- from cabal install split but apparently part of newer instances of Haskell Platform
 import Language.Haskell.TH
 
-transformer :: String -> Q Exp
+transformer :: Name -> Q Exp
 transformer name = do
-  var <- newName "x"
-  var1 <- newName "p"
-  var2 <- newName "f"
+  seqN <- newName "x"
+  goodSeqN <- newName "p"
+  viewN <- newName "f"
   -- Explicitly construct the pattern because I am matching a record
   -- with dynamic field labels.
-  let pat = AsP var1 (RecP (mkName "PartialSequence")
-                           [(mkName from, ConP 'Data.Maybe.Just [VarP var2]),
-                            (mkName to, ConP 'Data.Maybe.Nothing [])])
-  body <- [| Just ($(recUpdE (varE var1) [fieldExp (mkName to) [| Just ($(dyn name) $(varE var2)) |]]) ) |]
+  let pat = AsP goodSeqN (RecP (mkName "PartialSequence")
+                               [(mkName from, ConP 'Data.Maybe.Just [VarP viewN]),
+                                (mkName to, ConP 'Data.Maybe.Nothing [])])
+  body <- [| Just ($(recUpdE (varE goodSeqN) [fieldExp (mkName to) [| Just ($(varE name) $(varE viewN)) |]]) ) |]
   -- Explicitly construct the lambda because I explicitly constructed
   -- its pattern.
-  return $ LamE [VarP var] (CaseE (VarE var) [Match pat (NormalB body) [], Match WildP (NormalB $ ConE 'Nothing) []])
-    where [from,(c:to')] = splitOn "To" name
+  return $ LamE [VarP seqN] (CaseE (VarE seqN) [ Match pat (NormalB body) []
+                                               , Match WildP (NormalB $ ConE 'Nothing) []])
+    where [from,(c:to')] = splitOn "To" $ nameBase name
           to = (toLower c:to')
           
 
