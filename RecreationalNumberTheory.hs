@@ -222,3 +222,7 @@ define = freeze . complete . build where
 
 square = define [Generator (\k -> k * k)]
 squares = square
+
+-- TODO Define sequences
+-- TODO Test thoroughly
+-- TODO Figure out how to get high-quality Core from this
