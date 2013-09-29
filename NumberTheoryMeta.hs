@@ -14,7 +14,7 @@ transformer name = do
   viewN <- newName "f"
   -- Explicitly construct the pattern because I am matching a record
   -- with dynamic field labels.
-  let pat = AsP goodSeqN (RecP (mkName "PartialSequence")
+  let pat = AsP goodSeqN (RecP (mkName "PartialSequence") -- TODO Bring this in as a Name by hacking module imports?
                                [(mkName from, ConP 'Data.Maybe.Just [VarP viewN]),
                                 (mkName to, ConP 'Data.Maybe.Nothing [])])
   body <- [| Just ($(recUpdE (varE goodSeqN) [fieldExp (mkName to) [| Just ($(varE name) $(varE viewN)) |]]) ) |]
