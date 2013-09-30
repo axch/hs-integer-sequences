@@ -139,7 +139,9 @@ invertByBinarySearch f n = up 0 where
 generatorToInverter :: (Integral ind, Ord a) => (ind -> a) -> (a -> Betweens ind)
 generatorToInverter = invertByBinarySearch
 
--- TODO inverterToGenerator
+inverterToGenerator :: (Ord ind, Integral a) => (a -> Betweens ind) -> (ind -> a)
+ -- In this use case, result should always be Exactly, so ceiling is OK.
+inverterToGenerator inv = ceiling . invertByBinarySearch inv . Exactly
 
 inverterToTester :: (a -> Betweens ind) -> a -> Bool
 inverterToTester inv n = case inv n of
@@ -183,7 +185,7 @@ counterToInverter c n = if nCount == 0 then
 --     Just s{ tester = Just $ inverterToTester inv }
 -- inverterToTesterS _ = Nothing
 
-transforms :: (Integral ind, Num a, Ord a, Enum a) => [PartialSequence ind a -> Maybe (PartialSequence ind a)]
+transforms :: (Integral ind, Integral a) => [PartialSequence ind a -> Maybe (PartialSequence ind a)]
 transforms = $(listE $ map transformer
   [ 'inverterToTester
   , 'inverterToCounter
@@ -210,10 +212,10 @@ transforms = $(listE $ map transformer
   , 'upRangerToDownRanger
   , 'downRangerToUpRanger
   , 'streamerToGenerator
-  -- TODO , 'inverterToGenerator
+  , 'inverterToGenerator -- Forces (Integral a) rather than (Num a, Ord a, Enum a)
   ])
 
-define :: (Integral ind, Num a, Ord a, Enum a) => [View ind a] -> Sequence ind a
+define :: (Integral ind, Integral a) => [View ind a] -> Sequence ind a
 define = freeze . complete . build where
     build = foldl' addView empty
     complete s = case listToMaybe $ catMaybes $ map ($ s) transforms of
