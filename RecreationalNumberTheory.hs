@@ -185,6 +185,8 @@ counterToInverter c n = if nCount == 0 then
 --     Just s{ tester = Just $ inverterToTester inv }
 -- inverterToTesterS _ = Nothing
 
+-- TODO Should I try to generalize this type signature by defining
+-- appropriate typeclasses for the operations I actually use?
 transforms :: (Integral ind, Integral a) => [PartialSequence ind a -> Maybe (PartialSequence ind a)]
 transforms = $(listE $ map transformer
   [ 'inverterToTester
