@@ -47,7 +47,7 @@ data PartialSequence ind a
     = PartialSequence { generator :: Maybe (ind -> a)
                       , inverter :: Maybe (a -> Betweens ind)
                       , tester :: Maybe (a -> Bool)
-                      , counter :: Maybe (a -> a -> Integer)
+                      , counter :: Maybe (a -> a -> ind)
                       , streamer :: Maybe (() -> [a])
                       , upStreamer :: Maybe (a -> [a])
                       , downStreamer :: Maybe (a -> [a])
@@ -62,7 +62,7 @@ data View ind a
     = Generator (ind -> a)
     | Inverter (a -> Betweens ind)
     | Tester (a -> Bool)
-    | Counter (a -> a -> Integer) -- Is there a good way to generalize this like genericLength?
+    | Counter (a -> a -> ind)
     | Streamer (() -> [a])
     | UpStreamer (a -> [a])
     | DownStreamer (a -> [a])
@@ -84,7 +84,7 @@ data Sequence ind a
     = Sequence { kth :: (ind -> a)
                , root :: (a -> Betweens ind)
                , is :: (a -> Bool)
-               , count :: (a -> a -> Integer)
+               , count :: (a -> a -> ind)
                , the :: (() -> [a])
                , from :: (a -> [a])
                , downFrom :: (a -> [a])
@@ -186,9 +186,9 @@ counterToInverter c n = if nCount == 0 then
 transforms :: (Integral ind, Num a, Ord a, Enum a) => [PartialSequence ind a -> Maybe (PartialSequence ind a)]
 transforms = $(listE $ map transformer
   [ 'inverterToTester
-  -- , 'inverterToCounter -- TODO Debug this error message
+  , 'inverterToCounter
   , 'counterToTester
-  -- , 'counterToInverter -- TODO Debug this error message
+  , 'counterToInverter
   , 'generatorToStreamer
   , 'downRangerToDownStreamer
   , 'upStreamerToStreamer
