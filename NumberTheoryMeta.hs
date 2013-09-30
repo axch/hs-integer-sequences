@@ -7,6 +7,8 @@ import Data.Char
 import Data.List.Split -- from cabal install split but apparently part of newer instances of Haskell Platform
 import Language.Haskell.TH
 
+-- The tutorial I used to write this is somewhat hard to pin down:
+-- http://web.archive.org/web/20090421010040/http://www.haskell.org/bz/th3.htm
 transformer :: Name -> Q Exp
 transformer name = do
   seqN <- newName "x"
