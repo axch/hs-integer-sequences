@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module RecreationalNumberTheory where
 
 import Prelude hiding (ceiling)
