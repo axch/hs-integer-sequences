@@ -81,7 +81,7 @@ addView s (UpRanger f) = s{upRanger = Just f}
 addView s (DownRanger f) = s{downRanger = Just f}
 
 data Sequence ind a
-    = Sequence { kth :: (ind -> a)
+    = Sequence { number :: (ind -> a)
                , root :: (a -> Betweens ind)
                , is :: (a -> Bool)
                , count :: (a -> a -> ind)
@@ -93,7 +93,7 @@ data Sequence ind a
                }
 
 freeze :: PartialSequence ind a -> Sequence ind a
-freeze PartialSequence { generator = Just kth
+freeze PartialSequence { generator = Just number
                        , inverter = Just root
                        , tester = Just is
                        , counter = Just count
@@ -103,7 +103,7 @@ freeze PartialSequence { generator = Just kth
                        , upRanger = Just fromTo
                        , downRanger = Just downFromTo
                        }
-    = Sequence { kth = kth
+    = Sequence { number = number
                , root = root
                , is = is
                , count = count
